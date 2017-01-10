@@ -23,7 +23,6 @@
  *
  */
 
- 
 #include <sstream>
 #include <math.h>
 #include <unistd.h>
