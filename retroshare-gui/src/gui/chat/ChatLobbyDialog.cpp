@@ -88,7 +88,7 @@ ChatLobbyDialog::ChatLobbyDialog(const ChatLobbyId& lid, QWidget *parent, Qt::Wi
     ui.participantsList->setColumnHidden(COLUMN_ID,true);
 
     muteAct = new QAction(QIcon(), tr("Mute participant"), this);
-    banAct = new QAction(QIcon(":/icons/png/thumbs-down.png"), tr("Ban this person (Sets negative opinion)"), this);
+    voteNegativeAct = new QAction(QIcon(":/icons/png/thumbs-down.png"), tr("Ban this person (Sets negative opinion)"), this);
     voteNeutralAct = new QAction(QIcon(":/icons/png/thumbs-neutral.png"), tr("Give neutral opinion"), this);
     votePositiveAct = new QAction(QIcon(":/icons/png/thumbs-up.png"), tr("Give positive opinion"), this);
     distantChatAct = new QAction(QIcon(":/images/chat_24.png"), tr("Start private chat"), this);
@@ -110,10 +110,20 @@ ChatLobbyDialog::ChatLobbyDialog(const ChatLobbyId& lid, QWidget *parent, Qt::Wi
     connect(muteAct, SIGNAL(triggered()), this, SLOT(changePartipationState()));
     connect(distantChatAct, SIGNAL(triggered()), this, SLOT(distantChatParticipant()));
     connect(sendMessageAct, SIGNAL(triggered()), this, SLOT(sendMessage()));
+<<<<<<< HEAD
     connect(votePositiveAct, SIGNAL(triggered()), this, SLOT(voteParticipant(1)));
     connect(voteNeutralAct, SIGNAL(triggered()), this, SLOT(voteParticipant(0)));
     connect(banAct, SIGNAL(triggered()), this, SLOT(voteParticipant(-1)));
+=======
+    connect(votePositiveAct, SIGNAL(triggered()), this, SLOT(voteParticipant()));
+    connect(voteNeutralAct, SIGNAL(triggered()), this, SLOT(voteParticipant()));
+    connect(voteNegativeAct, SIGNAL(triggered()), this, SLOT(voteParticipant()));
+>>>>>>> c00caa967dc303a42df2e062c4572744aad9d599
     connect(showinpeopleAct, SIGNAL(triggered()), this, SLOT(showInPeopleTab()));
+
+    votePositiveAct->setData(RsReputations::OPINION_POSITIVE);
+    voteNeutralAct->setData(RsReputations::OPINION_NEUTRAL);
+    voteNegativeAct->setData(RsReputations::OPINION_NEGATIVE);
 
     connect(actionSortByName, SIGNAL(triggered()), this, SLOT(sortParcipants()));
     connect(actionSortByActivity, SIGNAL(triggered()), this, SLOT(sortParcipants()));
@@ -230,14 +240,20 @@ void ChatLobbyDialog::participantsTreeWidgetCustomPopupMenu(QPoint)
     contextMnu.addAction(muteAct);
     contextMnu.addAction(votePositiveAct);
     contextMnu.addAction(voteNeutralAct);
-    contextMnu.addAction(banAct);
+    contextMnu.addAction(voteNegativeAct);
 	contextMnu.addAction(showinpeopleAct);
 
+<<<<<<< HEAD
+=======
+	distantChatAct->setEnabled(false);
+	sendMessageAct->setEnabled(selectedItems.count()==1);
+>>>>>>> c00caa967dc303a42df2e062c4572744aad9d599
 	muteAct->setCheckable(true);
     muteAct->setEnabled(false);
     muteAct->setChecked(false);
     votePositiveAct->setEnabled(false);
     voteNeutralAct->setEnabled(false);
+<<<<<<< HEAD
     banAct->setEnabled(false);
     showinpeopleAct->setEnabled(false);
 
@@ -304,6 +320,51 @@ void ChatLobbyDialog::voteParticipant(int vote)
             std::cerr << "Giving " << vote << " opinion to GXS id " << nickname << std::endl;
             dynamic_cast<GxsIdRSTreeWidgetItem*>(*item)->forceUpdate();
         }
+=======
+    voteNegativeAct->setEnabled(false);
+	showinpeopleAct->setEnabled(selectedItems.count()==1);
+    if(selectedItems.count()==1)
+    {
+        RsGxsId gxsid(selectedItems.at(0)->text(COLUMN_ID).toStdString());
+
+		if(!gxsid.isNull() && !rsIdentity->isOwnId(gxsid))
+		{
+			distantChatAct->setEnabled(true);
+			votePositiveAct->setEnabled(rsReputations->overallReputationLevel(gxsid) != RsReputations::REPUTATION_LOCALLY_POSITIVE);
+			voteNeutralAct->setEnabled((rsReputations->overallReputationLevel(gxsid) == RsReputations::REPUTATION_LOCALLY_POSITIVE) || (rsReputations->overallReputationLevel(gxsid) == RsReputations::REPUTATION_LOCALLY_NEGATIVE) );
+			voteNegativeAct->setEnabled(rsReputations->overallReputationLevel(gxsid) != RsReputations::REPUTATION_LOCALLY_NEGATIVE);
+
+			muteAct->setChecked(!isParticipantMuted(gxsid));
+		}
+    }
+	contextMnu.exec(QCursor::pos());
+}
+
+void ChatLobbyDialog::voteParticipant()
+{
+    QList<QTreeWidgetItem*> selectedItems = ui.participantsList->selectedItems();
+    if (selectedItems.isEmpty())
+	    return;
+    QList<QTreeWidgetItem*>::iterator item;
+
+    QAction *act = dynamic_cast<QAction*>(sender()) ;
+    if(!act)
+    {
+        std::cerr << "No sender! Some bug in the code." << std::endl;
+        return ;
+    }
+
+	RsReputations::Opinion op = RsReputations::Opinion(act->data().toUInt()) ;
+
+    for (item = selectedItems.begin(); item != selectedItems.end(); ++item)
+	{
+		RsGxsId nickname;
+	    dynamic_cast<GxsIdRSTreeWidgetItem*>(*item)->getId(nickname) ;
+
+		rsReputations->setOwnOpinion(nickname, op);
+		std::cerr << "Giving opinion to GXS id " << nickname << " to " << op<< std::endl;
+		dynamic_cast<GxsIdRSTreeWidgetItem*>(*item)->forceUpdate();
+>>>>>>> c00caa967dc303a42df2e062c4572744aad9d599
     }
 }
 
