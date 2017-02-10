@@ -902,12 +902,12 @@ void DistributedChatService::sendLobbyStatusPeerChangedNickname(const ChatLobbyI
 
 void DistributedChatService::sendLobbyStatusPeerLiving(const ChatLobbyId& lobby_id)
 {
-    sendLobbyStatusItem(lobby_id,RS_CHAT_LOBBY_EVENT_PEER_LEFT,std::string()) ;
+    //sendLobbyStatusItem(lobby_id,RS_CHAT_LOBBY_EVENT_PEER_LEFT,std::string()) ;
 }
 
 void DistributedChatService::sendLobbyStatusNewPeer(const ChatLobbyId& lobby_id)
 {
-    sendLobbyStatusItem(lobby_id,RS_CHAT_LOBBY_EVENT_PEER_JOINED,std::string()) ;
+    //sendLobbyStatusItem(lobby_id,RS_CHAT_LOBBY_EVENT_PEER_JOINED,std::string()) ;
 }
 
 void DistributedChatService::sendLobbyStatusKeepAlive(const ChatLobbyId& lobby_id)
