@@ -428,11 +428,10 @@ protected:
 
 public:
     /*!
-     * Assigns a token value to passed integer
-     * The status of the token can still be queried from request status feature
-     * @warning the token space is shared with RsGenExchange backend, so do not
-     * modify tokens except does you have created by calling generatePublicToken()
-     * @return  token
+	 * Generate a new token, the status of the token can be queried from request
+	 * status feature.
+	 * @attention the token space is shared with RsGenExchange backend.
+	 * @return Generated token
      */
     uint32_t generatePublicToken();
 
@@ -486,7 +485,7 @@ public:
 	 * This allows the client service to acknowledge that their grps has \n
 	 * been created/modified and retrieve the create/modified grp ids
 	 * @param token the token related to modification/create request
-	 * @param msgIds vector of ids of groups created/modified
+	 * @param grpId ids of created/modified group
 	 * @return true if token exists false otherwise
 	 */
     bool acknowledgeTokenGrp(const uint32_t& token, RsGxsGroupId& grpId);
@@ -647,6 +646,7 @@ public:
     virtual uint32_t getDefaultSyncPeriod();
     virtual uint32_t getSyncPeriod(const RsGxsGroupId& grpId) ;
     virtual void     setSyncPeriod(const RsGxsGroupId& grpId,uint32_t age_in_secs) ;
+	virtual bool     getGroupNetworkStats(const RsGxsGroupId& grpId,RsGroupNetworkStats& stats);
 
     uint16_t serviceType() const { return mServType ; }
     uint32_t serviceFullType() const { return ((uint32_t)mServType << 8) + (((uint32_t) RS_PKT_VERSION_SERVICE) << 24); }
@@ -689,6 +689,8 @@ private:
     void processRoutingClues();
 
     void publishMsgs();
+
+	bool checkGroupMetaConsistency(const RsGroupMetaData& meta);
 
     /*!
      * processes msg local meta changes
@@ -876,6 +878,7 @@ private:
 
 private:
 
+	// TODO: cleanup this should be an enum!
     const uint8_t CREATE_FAIL, CREATE_SUCCESS, CREATE_FAIL_TRY_LATER, SIGN_MAX_WAITING_TIME;
     const uint8_t SIGN_FAIL, SIGN_SUCCESS, SIGN_FAIL_TRY_LATER;
     const uint8_t VALIDATE_FAIL, VALIDATE_SUCCESS, VALIDATE_FAIL_TRY_LATER, VALIDATE_MAX_WAITING_TIME;

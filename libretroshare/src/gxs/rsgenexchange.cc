@@ -63,8 +63,8 @@ static const uint32_t INDEX_AUTHEN_ADMIN        = 0x00000040; // admin key
 
 //#define GEN_EXCH_DEBUG	1
 
-#define MSG_CLEANUP_PERIOD     60*59 // 59 minutes
-#define INTEGRITY_CHECK_PERIOD 60*31 // 31 minutes
+static const uint32_t MSG_CLEANUP_PERIOD     = 60*59; // 59 minutes
+static const uint32_t INTEGRITY_CHECK_PERIOD = 60*31; // 31 minutes
 
 RsGenExchange::RsGenExchange(RsGeneralDataService *gds, RsNetworkExchangeService *ns,
                              RsSerialType *serviceSerialiser, uint16_t servType, RsGixs* gixs,
@@ -81,7 +81,7 @@ RsGenExchange::RsGenExchange(RsGeneralDataService *gds, RsNetworkExchangeService
   mLastClean((int)time(NULL) - (int)(RSRandom::random_u32() % MSG_CLEANUP_PERIOD)),	// this helps unsynchronising the checks for the different services
   mMsgCleanUp(NULL),
   mChecking(false),
-  mLastCheck((int)time(NULL) - (int)(RSRandom::random_u32() % INTEGRITY_CHECK_PERIOD)),	// this helps unsynchronising the checks for the different services
+  mLastCheck((int)time(NULL) - (int)(RSRandom::random_u32() % INTEGRITY_CHECK_PERIOD) + 120),	// this helps unsynchronising the checks for the different services, with 2 min security to avoid checking right away before statistics come up.
   mIntegrityCheck(NULL),
   CREATE_FAIL(0),
   CREATE_SUCCESS(1),
@@ -211,6 +211,11 @@ void RsGenExchange::tick()
                                         	std::cerr << "    " << *it << std::endl;
 #endif
 					mNotifications.push_back(gc);
+
+                    // also notify the network exchange service that these groups no longer exist.
+
+                    if(mNetService)
+                        mNetService->removeGroups(grpIds) ;
 				}
 
 				if (!msgIds.empty()) {
@@ -238,11 +243,14 @@ void RsGenExchange::tick()
 
 bool RsGenExchange::messagePublicationTest(const RsGxsMsgMetaData& meta)
 {
-	time_t now = time(NULL) ;
+	time_t st = MESSAGE_STORE_PERIOD;
 
-    uint32_t store_limit =  (mNetService == NULL)?MESSAGE_STORE_PERIOD:mNetService->getKeepAge(meta.mGroupId,MESSAGE_STORE_PERIOD) ;
+	if(mNetService)
+        st = mNetService->getKeepAge(meta.mGroupId, st);
 
-	return meta.mMsgStatus & GXS_SERV::GXS_MSG_STATUS_KEEP || store_limit == 0 || meta.mPublishTs + store_limit >= now ;
+	time_t storageTimeLimit = meta.mPublishTs + st;
+
+	return meta.mMsgStatus & GXS_SERV::GXS_MSG_STATUS_KEEP || st == 0 || storageTimeLimit >= time(NULL);
 }
 
 bool RsGenExchange::acknowledgeTokenMsg(const uint32_t& token,
@@ -1291,20 +1299,19 @@ bool RsGenExchange::getGroupData(const uint32_t &token, std::vector<RsGxsGrpItem
 				RsGxsGrpItem* gItem = dynamic_cast<RsGxsGrpItem*>(item);
 				if (gItem)
 				{
-                    gItem->meta = *((*lit)->metaData);
+					gItem->meta = *((*lit)->metaData);
 
-            RsGroupNetworkStats sts ;
-
-            if(mNetService != NULL && mNetService->getGroupNetworkStats(gItem->meta.mGroupId,sts))
-        {
-                gItem->meta.mPop = sts.mSuppliers ;
-        gItem->meta.mVisibleMsgCount  = sts.mMaxVisibleCount;
-        }
-            else
-        {
-                gItem->meta.mPop = 0 ;
-        gItem->meta.mVisibleMsgCount = 0 ;
-        }
+					RsGroupNetworkStats sts ;
+					if(mNetService && mNetService->getGroupNetworkStats(gItem->meta.mGroupId,sts))
+					{
+						gItem->meta.mPop = sts.mSuppliers;
+						gItem->meta.mVisibleMsgCount  = sts.mMaxVisibleCount;
+					}
+					else
+					{
+						gItem->meta.mPop = 0;
+						gItem->meta.mVisibleMsgCount = 0;
+					}
 					grpItem.push_back(gItem);
 				}
 				else
@@ -1552,15 +1559,90 @@ void RsGenExchange::notifyChangedGroupStats(const RsGxsGroupId &grpId)
 	mNotifications.push_back(gc);
 }
 
+bool RsGenExchange::checkGroupMetaConsistency(const RsGroupMetaData& meta)
+{
+    std::cerr << "Checking group consistency:" << std::endl;
+
+    if(meta.mGroupName.empty())
+    {
+        std::cerr << "(EE) cannot create a group with no name." << std::endl;
+        return false;
+    }
+
+    uint32_t gf = meta.mGroupFlags & GXS_SERV::FLAG_PRIVACY_MASK ;
+
+    if(gf != GXS_SERV::FLAG_PRIVACY_PUBLIC && gf != GXS_SERV::FLAG_PRIVACY_RESTRICTED && gf != GXS_SERV::FLAG_PRIVACY_PRIVATE)
+    {
+        std::cerr << "(EE) mGroupFlags has incorrect value " << std::hex << meta.mGroupFlags << std::dec << ". A value among GXS_SERV::FLAG_PRIVACY_{PUBLIC,RESTRICTED,PRIVATE} is expected." << std::endl;
+        return false ;
+    }
+
+    if(meta.mCircleType < GXS_CIRCLE_TYPE_PUBLIC || meta.mCircleType > GXS_CIRCLE_TYPE_YOUR_EYES_ONLY)
+    {
+        std::cerr << "(EE) mCircleType has incorrect value " << std::hex << meta.mCircleType << std::dec << ". A single value among GXS_CIRCLE_TYPE_{PUBLIC,EXTERNAL,YOUR_FRIENDS_ONLY,LOCAL,EXT_SELF,YOUR_EYES_ONLY} is expected." << std::endl;
+        return false ;
+    }
+
+    if(meta.mCircleType == GXS_CIRCLE_TYPE_EXTERNAL)
+    {
+		if(!meta.mInternalCircle.isNull())
+        {
+            std::cerr << "(EE) Group circle type is EXTERNAL, but an internal circle ID " << meta.mInternalCircle << " was supplied. This is an error." << std::endl;
+            return false ;
+        }
+		if(meta.mCircleId.isNull())
+        {
+            std::cerr << "(EE) Group circle type is EXTERNAL, but no external circle ID was supplied. meta.mCircleId is indeed empty. This is an error." << std::endl;
+            return false ;
+        }
+    }
+
+    if(meta.mCircleType == GXS_CIRCLE_TYPE_YOUR_FRIENDS_ONLY)
+    {
+        if(!meta.mCircleId.isNull())
+        {
+            std::cerr << "(EE) Group circle type is YOUR_FRIENDS_ONLY, but an external circle ID " << meta.mCircleId << " was supplied. This is an error." << std::endl;
+            return false ;
+        }
+		if(meta.mInternalCircle.isNull())
+        {
+            std::cerr << "(EE) Group circle type is YOUR_FRIENDS_ONLY, but no internal circle ID was supplied. meta.mInternalCircle is indeed empty. This is an error." << std::endl;
+            return false ;
+        }
+    }
+
+    if(meta.mCircleType == GXS_CIRCLE_TYPE_EXT_SELF)
+    {
+        if(!meta.mCircleId.isNull())
+        {
+            std::cerr << "(EE) Group circle type is EXT_SELF, but an external circle ID " << meta.mCircleId << " was supplied. This is an error." << std::endl;
+            return false ;
+        }
+		if(!meta.mInternalCircle.isNull())
+        {
+            std::cerr << "(EE) Group circle type is EXT_SELF, but an internal circle ID " << meta.mInternalCircle << " was supplied. This is an error." << std::endl;
+            return false ;
+        }
+    }
+
+    std::cerr << "Group is clean." << std::endl;
+    return true ;
+}
+
 void RsGenExchange::publishGroup(uint32_t& token, RsGxsGrpItem *grpItem)
 {
+    if(!checkGroupMetaConsistency(grpItem->meta))
+    {
+        std::cerr << "(EE) Cannot publish group. Some information was not supplied." << std::endl;
+       return ;
+    }
 
 	RS_STACK_MUTEX(mGenMtx) ;
     token = mDataAccess->generatePublicToken();
     GxsGrpPendingSign ggps(grpItem, token);
     mGrpsToPublish.push_back(ggps);
 
-#ifdef GEN_EXCH_DEBUG	
+#ifdef GEN_EXCH_DEBUG
     std::cerr << "RsGenExchange::publishGroup() token: " << token;
     std::cerr << std::endl;
 #endif
@@ -1570,6 +1652,12 @@ void RsGenExchange::publishGroup(uint32_t& token, RsGxsGrpItem *grpItem)
 
 void RsGenExchange::updateGroup(uint32_t& token, RsGxsGrpItem* grpItem)
 {
+    if(!checkGroupMetaConsistency(grpItem->meta))
+    {
+        std::cerr << "(EE) Cannot update group. Some information was not supplied." << std::endl;
+       return ;
+    }
+
 					RS_STACK_MUTEX(mGenMtx) ;
 	token = mDataAccess->generatePublicToken();
         mGroupUpdatePublish.push_back(GroupUpdatePublish(grpItem, token));
@@ -1635,6 +1723,11 @@ uint32_t RsGenExchange::getSyncPeriod(const RsGxsGroupId& grpId)
         return mNetService->getSyncAge(grpId);
     else
         return RS_GXS_DEFAULT_MSG_REQ_PERIOD;
+}
+
+bool     RsGenExchange::getGroupNetworkStats(const RsGxsGroupId& grpId,RsGroupNetworkStats& stats)
+{
+	return (!mNetService) || mNetService->getGroupNetworkStats(grpId,stats) ;
 }
 
 void     RsGenExchange::setSyncPeriod(const RsGxsGroupId& grpId,uint32_t age_in_secs)

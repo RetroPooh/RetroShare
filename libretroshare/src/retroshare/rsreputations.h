@@ -48,7 +48,7 @@ public:
 
 	struct ReputationInfo
 	{
-		ReputationInfo() : mOwnOpinion(OPINION_NEUTRAL), mFriendAverageScore(REPUTATION_THRESHOLD_DEFAULT),mOverallReputationLevel(REPUTATION_NEUTRAL){}
+		ReputationInfo() : mOwnOpinion(OPINION_NEUTRAL),mFriendsPositiveVotes(0),mFriendsNegativeVotes(0), mFriendAverageScore(REPUTATION_THRESHOLD_DEFAULT),mOverallReputationLevel(REPUTATION_NEUTRAL){}
             
 		RsReputations::Opinion mOwnOpinion ;
 
@@ -61,7 +61,12 @@ public:
 	};
 
 	virtual bool setOwnOpinion(const RsGxsId& key_id, const Opinion& op) =0;
-    virtual bool getReputationInfo(const RsGxsId& id, const RsPgpId &ownerNode, ReputationInfo& info) =0;
+	virtual bool getOwnOpinion(const RsGxsId& key_id, Opinion& op) =0;
+    virtual bool getReputationInfo(const RsGxsId& id, const RsPgpId &ownerNode, ReputationInfo& info,bool stamp=true) =0;
+
+    // This returns the reputation level and also the flags of the identity service for that id. This is useful in order to get these flags without relying on the async method of p3Identity
+
+    virtual ReputationLevel overallReputationLevel(const RsGxsId& id,uint32_t *identity_flags=NULL)=0;
 
     // parameters
 
@@ -72,6 +77,9 @@ public:
 	virtual uint32_t thresholdForRemotelyPositiveReputation()=0;
 	virtual void setThresholdForRemotelyNegativeReputation(uint32_t thresh)=0;
 	virtual void setThresholdForRemotelyPositiveReputation(uint32_t thresh)=0;
+
+    virtual void setRememberDeletedNodesThreshold(uint32_t days) =0;
+    virtual uint32_t rememberDeletedNodesThreshold() =0;
 
 	// This one is a proxy designed to allow fast checking of a GXS id.
 	// it basically returns true if assessment is not ASSESSMENT_OK

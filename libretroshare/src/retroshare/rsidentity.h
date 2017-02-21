@@ -43,7 +43,12 @@ extern RsIdentity *rsIdentity;
 
 
 // GroupFlags: Only one so far:
-#define RSGXSID_GROUPFLAG_REALID  0x0001
+
+// The deprecated flag overlaps the privacy flags for mGroupFlags. This is an error that should be fixed. For the sake of keeping some
+// backward compatibility, we need to make the change step by step.
+
+#define RSGXSID_GROUPFLAG_REALID_kept_for_compatibility  0x0001
+#define RSGXSID_GROUPFLAG_REALID                         0x0100
 
 // THESE ARE FLAGS FOR INTERFACE.
 #define RSID_TYPE_MASK		0xff00
@@ -289,6 +294,9 @@ public:
     virtual bool updateIdentity(uint32_t& token, RsGxsIdGroup &group) = 0;
     virtual bool deleteIdentity(uint32_t& token, RsGxsIdGroup &group) = 0;
 
+    virtual void setDeleteBannedNodesThreshold(uint32_t days) =0;
+    virtual uint32_t deleteBannedNodesThreshold() =0;
+
     virtual bool parseRecognTag(const RsGxsId &id, const std::string &nickname,
                                 const std::string &tag, RsRecognTagDetails &details) = 0;
     virtual bool getRecognTagRequest(const RsGxsId &id, const std::string &comment,
@@ -303,7 +311,6 @@ public:
      * \param id
      * \return
      */
-    virtual RsReputations::ReputationLevel overallReputationLevel(const RsGxsId& id)=0;
     virtual time_t getLastUsageTS(const RsGxsId &id) =0;
 
     // Specific RsIdentity Functions....

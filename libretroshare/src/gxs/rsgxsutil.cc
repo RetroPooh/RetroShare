@@ -171,7 +171,7 @@ bool RsGxsIntegrityCheck::check()
 					    GXSUTIL_DEBUG() << "TimeStamping group authors' key ID " << grp->metaData->mAuthorId << " in group ID " << grp->grpId << std::endl;
 #endif
 
-					if(rsIdentity!=NULL && rsIdentity->overallReputationLevel(grp->metaData->mAuthorId) > RsReputations::REPUTATION_LOCALLY_NEGATIVE)
+					if(rsReputations!=NULL && rsReputations->overallReputationLevel(grp->metaData->mAuthorId) > RsReputations::REPUTATION_LOCALLY_NEGATIVE)
 						used_gxs_ids.insert(std::make_pair(grp->metaData->mAuthorId,RsIdentityUsage(mGenExchangeClient->serviceType(),RsIdentityUsage::GROUP_AUTHOR_KEEP_ALIVE,grp->grpId))) ;
 				    }
 			    }
@@ -188,20 +188,17 @@ bool RsGxsIntegrityCheck::check()
 		    grpsToDel.push_back(grp->grpId);
 	    }
 
-#ifdef TODO
-		if(!(grp->metaData->mSubscribeFlags & GXS_SERV::GROUP_SUBSCRIBE_SUBSCRIBED))
+		if(!(grp->metaData->mSubscribeFlags & GXS_SERV::GROUP_SUBSCRIBE_SUBSCRIBED) && !(grp->metaData->mSubscribeFlags & GXS_SERV::GROUP_SUBSCRIBE_ADMIN) && !(grp->metaData->mSubscribeFlags & GXS_SERV::GROUP_SUBSCRIBE_PUBLISH))
         {
             RsGroupNetworkStats stats ;
             mGenExchangeClient->getGroupNetworkStats(grp->grpId,stats);
 
-            if(stats.mSuppliers == 0 && stats.mMaxVisibleCount == 0)
+            if(stats.mSuppliers == 0 && stats.mMaxVisibleCount == 0 && stats.mGrpAutoSync)
             {
-                GXSUTIL_DEBUG() << "Scheduling group \"" << grp->metaData->mGroupName << "\" ID=" << grp->grpId << " for deletion because it has no suppliers not any visible data at friends." << std::endl;
-#warning Should we do that here? What happens for groups that are normally empty such as identities?
+                GXSUTIL_DEBUG() << "Scheduling group \"" << grp->metaData->mGroupName << "\" ID=" << grp->grpId << " in service " << std::hex << mGenExchangeClient->serviceType() << std::dec << " for deletion because it has no suppliers not any visible data at friends." << std::endl;
 				grpsToDel.push_back(grp->grpId);
             }
         }
-#endif
 
 	    delete grp;
     }
@@ -269,7 +266,7 @@ bool RsGxsIntegrityCheck::check()
 #ifdef DEBUG_GXSUTIL
 			    GXSUTIL_DEBUG() << "TimeStamping message authors' key ID " << msg->metaData->mAuthorId << " in message " << msg->msgId << ", group ID " << msg->grpId<< std::endl;
 #endif
-			    if(rsIdentity!=NULL && rsIdentity->overallReputationLevel(msg->metaData->mAuthorId) > RsReputations::REPUTATION_LOCALLY_NEGATIVE)
+			    if(rsReputations!=NULL && rsReputations->overallReputationLevel(msg->metaData->mAuthorId) > RsReputations::REPUTATION_LOCALLY_NEGATIVE)
 				    used_gxs_ids.insert(std::make_pair(msg->metaData->mAuthorId,RsIdentityUsage(mGenExchangeClient->serviceType(),RsIdentityUsage::MESSAGE_AUTHOR_KEEP_ALIVE,msg->metaData->mGroupId,msg->metaData->mMsgId))) ;
 		    }
 
