@@ -25,6 +25,8 @@
 #include "gui/notifyqt.h"
 #include "gui/msgs/MessageComposer.h"
 #include "gui/connect/ConnectFriendWizard.h"
+#include <gui/QuickStartWizard.h>
+#include "gui/connect/FriendRecommendDialog.h"
 
 #if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
 #include <QUrlQuery>
@@ -60,13 +62,18 @@ HomePage::HomePage(QWidget *parent) :
     QAction *SendAction = new QAction(QIcon(),tr("Send via Email"), this);
     connect(SendAction, SIGNAL(triggered()), this, SLOT(runEmailClient()));
 		
+    QAction *RecAction = new QAction(QIcon(),tr("Recommend friends to each others"), this);
+    connect(RecAction, SIGNAL(triggered()), this, SLOT(recommendFriends()));
+
 		QMenu *menu = new QMenu();
     menu->addAction(CopyAction);
     menu->addAction(SaveAction);
     menu->addAction(SendAction);
+    menu->addAction(RecAction);
 
     ui->shareButton->setMenu(menu);
-
+	
+	connect(ui->runStartWizard_PB,SIGNAL(clicked()), this,SLOT(runStartWizard())) ;
 }
 
 HomePage::~HomePage()
@@ -109,6 +116,11 @@ static void sendMail(QString sAddress, QString sSubject, QString sBody)
 	QDesktopServices::openUrl (url);
 }
 
+void HomePage::recommendFriends()
+{
+    FriendRecommendDialog::showIt() ;
+}
+
 void HomePage::runEmailClient()
 {
 	sendMail("", tr("RetroShare Invite"), ui->userCertEdit->toPlainText());
@@ -145,4 +157,9 @@ void HomePage::addFriend()
 
     connwiz.setStartId(ConnectFriendWizard::Page_Text);
     connwiz.exec ();
+}
+
+void HomePage::runStartWizard()
+{
+    QuickStartWizard(this).exec();
 }

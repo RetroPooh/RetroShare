@@ -46,7 +46,6 @@ public:
 	  virtual QIcon iconPixmap() const { return QPixmap(":/icons/svg/profile.svg") ; } //MainPage
     virtual QString pageName() const { return tr("Home") ; } //MainPage
     virtual QString helpText() const { return ""; } //MainPage
-    
 
 private slots:
 	void updateOwnCert();
@@ -54,6 +53,8 @@ private slots:
 	void copyCert();
 	void saveCert();
   void addFriend();
+	void runStartWizard() ;
+	void recommendFriends();
 
 private:
 	Ui::HomePage *ui;
